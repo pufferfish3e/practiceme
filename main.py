@@ -7,18 +7,32 @@ from selenium.webdriver.support.ui import WebDriverWait #type: ignore
 from selenium.webdriver.support import expected_conditions as EC #type: ignore
 import time
 from webdriver_manager.chrome import ChromeDriverManager # type: ignore
-from dotenv import load_dotenv # type: ignore
-import os
 import google.generativeai as genai  
 from bs4 import BeautifulSoup
+import os
+from pathlib import Path
+from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Get the directory containing the script
+script_dir = Path(__file__).parent.absolute()
+# Construct path to .env file
+env_path = script_dir / '.env'
+# Load the .env file with explicit path
+load_dotenv(dotenv_path=env_path)
 
-# Get credentials from environment variables
+# Print debug info
+print(f"Looking for .env file at: {env_path}")
+print(f"File exists: {env_path.exists()}")
+
+# Get environment variables
 EMAIL = os.getenv("EMAIL")
 PASSWORD = os.getenv("PASSWORD")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # Get Gemini API key from .env
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# Load environment variables from .env file
+print(f"Email: {EMAIL}")
+print(f"Password: {"*"*len(PASSWORD)}")
+print(f"Gemini API Key: {GEMINI_API_KEY[0:2]}{"*"*(len(GEMINI_API_KEY) - 2)}")
 
 # Configure the Gemini API
 genai.configure(api_key=GEMINI_API_KEY)
@@ -415,10 +429,6 @@ try:
                 EC.presence_of_element_located((By.NAME, "password"))
             )
             
-            # Fill in the form
-            email_field.send_keys("your_email@example.com")
-            password_field.send_keys("your_password")
-            
             # Find the button using the exact CSS selector
             login_button = WebDriverWait(driver, 5).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "button.MuiButtonBase-root.MuiButton-root.MuiButton-contained.MuiButton-containedPrimary[type='submit']"))
@@ -428,7 +438,7 @@ try:
             print("Login attempted using alternative selectors")
             
             # Wait for redirect
-            time.sleep(5)
+            time.sleep(3)
             
         except Exception as e2:
             print(f"Alternative approach also failed: {e2}")
@@ -440,8 +450,8 @@ try:
 
 finally:
     # Optional: Add a pause to see the final state
-    print("Script completed. Browser will close in 5 seconds...")
-    time.sleep(5)
+    print("Script completed. Browser will close in 3 seconds...")
+    time.sleep(3)
     
     # Close the browser
     driver.quit()
