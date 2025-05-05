@@ -1,15 +1,52 @@
-<h1>About this project: </h1>
-<p>This project automates doing singleplayer practice questions on <a href='https://practiceme.vercel.app/'>PracticeMe</a>.</p>
-<h1>Required Dependencies: </h1>
-<ul>
-  <li>python3</li>
-  <li>Google Chrome</li>
-  <li>a Chrome Webdriver (more on that below)</li>
-  <li>Visual Studio Code, or another text-based code editor.</li>
-</ul>
-<h1>Installation Steps: </h1>
-<p>We recommend using a virtual environment to install dependencies. Learn more about virtual environments <a href="https://docs.python.org/3/library/venv.html">Here</a>.</p>
-<ol>
-  <li>Clone the git repository by running <code>git clone https://github.com/pufferfish3e/practiceme.git</code> in your terminal in Visual Studio Code or a code editor of your choice.</li>
-  <li>Run the following Command within your terminal: <br><code>touch .env && echo EMAIL=your_email@example.com > .env && echo PASSWORD=your_password >> .env && echo GEMINI_API_KEY=your_api_key >> .env</code></li>
-</ol>
+# PracticeMe Automation
+
+This project automates answering singleplayer practice questions on [PracticeMe](https://practiceme.vercel.app/).
+
+## 📦 Requirements
+
+- Python 3
+- Google Chrome
+- [Chrome WebDriver](https://chromedriver.chromium.org/downloads) (compatible with your version of Chrome)
+- Visual Studio Code (or any text/code editor)
+
+## ⚙️ Installation
+
+> 💡 It's recommended to use a [Python virtual environment](https://docs.python.org/3/library/venv.html) for managing dependencies.
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/pufferfish3e/practiceme.git
+cd practiceme
+```
+
+## 2. Set up your environment variables
+
+Create a .env file with your credentials and Gemini API key:
+
+```bash
+touch .env
+echo EMAIL=your_email@example.com >> .env
+echo PASSWORD=your_password >> .env
+echo GEMINI_API_KEY=your_api_key >> .env
+```
+
+## 3. Install Dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+## 4. Get a Gemini API Key
+
+Visit Google's Gemini API page and generate a key.
+
+## 5. Update your .env file
+
+Replace placeholder values with your actual iChat email, password, and Gemini API key.
+
+## 6. Run the Script
+
+```python
+python main.py
+```
