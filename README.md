@@ -1,4 +1,4 @@
-# PracticeMe Automation
+# PracticeMe Automation (Currently Broken)
 
 This project automates answering singleplayer practice questions on [PracticeMe](https://practiceme.vercel.app/).
 
