@@ -19,30 +19,26 @@ git clone https://github.com/pufferfish3e/practiceme.git
 cd practiceme
 ```
 
-## 2. Set up your environment variables
-
-Create a .env file with your credentials and Gemini API key:
-
-```bash
-touch .env
-echo EMAIL=your_email@example.com >> .env
-echo PASSWORD=your_password >> .env
-echo GEMINI_API_KEY=your_api_key >> .env
-```
-
-## 3. Install Dependencies:
+## 2. Install Dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## 4. Get a Gemini API Key
+## 3. Get a Gemini API Key
 
 Visit [Google's Gemini API page](https://ai.google.dev/gemini-api/docs/api-key) and generate a key.
 
-## 5. Update your .env file
+## 4. Update your main.py file
 
 Replace placeholder values with your actual iChat email, password, and Gemini API key.
+
+```python
+EMAIL = "YOUR_EMAIL"
+PASSWORD = "YOUR_PASSWORD"
+GEMINI_API_KEY = "YOUR_API_KEY"
+```
+
 
 ## 6. Run the Script
 

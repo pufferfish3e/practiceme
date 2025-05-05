@@ -1,5 +1,4 @@
 selenium
-bs4
-python-dotenv
+beautifulsoup
 google-generativeai
 webdriver-manager

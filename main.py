@@ -7,27 +7,13 @@ from selenium.webdriver.support.ui import WebDriverWait #type: ignore
 from selenium.webdriver.support import expected_conditions as EC #type: ignore
 import time
 from webdriver_manager.chrome import ChromeDriverManager # type: ignore
-import google.generativeai as genai  
-from bs4 import BeautifulSoup
-import os
-from pathlib import Path
-from dotenv import load_dotenv
+import google.generativeai as genai # type: ignore
+from bs4 import BeautifulSoup # type: ignore
 
-# Get the directory containing the script
-script_dir = Path(__file__).parent.absolute()
-# Construct path to .env file
-env_path = script_dir / '.env'
-# Load the .env file with explicit path
-load_dotenv(dotenv_path=env_path)
-
-# Print debug info
-print(f"Looking for .env file at: {env_path}")
-print(f"File exists: {env_path.exists()}")
-
-# Get environment variables
-EMAIL = os.getenv("EMAIL")
-PASSWORD = os.getenv("PASSWORD")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+# environment variables
+EMAIL = "YOUR_EMAIL"
+PASSWORD = "YOUR_PASSWORD"
+GEMINI_API_KEY = "YOUR_API_KEY"
 
 # Load environment variables from .env file
 print(f"Email: {EMAIL}")
