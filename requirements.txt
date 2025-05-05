@@ -2,3 +2,4 @@ selenium
 bs4
 dotenv
 google-generativeai
+webdriver-manager
