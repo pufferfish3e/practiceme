@@ -38,7 +38,7 @@ pip install -r requirements.txt
 
 ## 4. Get a Gemini API Key
 
-Visit [Google's Gemini API page][https://ai.google.dev/gemini-api/docs/api-key] and generate a key.
+Visit [Google's Gemini API page](https://ai.google.dev/gemini-api/docs/api-key) and generate a key.
 
 ## 5. Update your .env file
 
