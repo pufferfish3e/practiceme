@@ -6,7 +6,6 @@ This project automates answering singleplayer practice questions on [PracticeMe]
 
 - Python 3
 - Google Chrome
-- [Chrome WebDriver](https://chromedriver.chromium.org/downloads) (compatible with your version of Chrome)
 - Visual Studio Code (or any text/code editor)
 
 ## ⚙️ Installation
