@@ -10,6 +10,6 @@
 <h1>Installation Steps: </h1>
 <p>We recommend using a virtual environment to install dependencies. Learn more about virtual environments <a href="https://docs.python.org/3/library/venv.html">Here</a>.</p>
 <ol>
-  <li>Clone the git repository by running ``` git clone https://github.com/pufferfish3e/practiceme.git ``` in your terminal in Visual Studio Code or a code editor of your choice.</li>
-  <li>Run the following Command within your terminal: ``` touch .env && echo EMAIL=your_email@example.com > .env && echo PASSWORD=your_password >> .env && echo GEMINI_API_KEY=your_api_key >> .env ```</li>
+  <li>Clone the git repository by running <code>git clone https://github.com/pufferfish3e/practiceme.git</code> in your terminal in Visual Studio Code or a code editor of your choice.</li>
+  <li>Run the following Command within your terminal: <code>touch .env && echo EMAIL=your_email@example.com > .env && echo PASSWORD=your_password >> .env && echo GEMINI_API_KEY=your_api_key >> .env</code></li>
 </ol>
