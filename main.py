@@ -9,16 +9,51 @@ import time
 from webdriver_manager.chrome import ChromeDriverManager # type: ignore
 import google.generativeai as genai # type: ignore
 from bs4 import BeautifulSoup # type: ignore
+import settings
+
+settings.initialize()
 
 # environment variables
-EMAIL = "YOUR_EMAIL"
-PASSWORD = "YOUR_PASSWORD"
-GEMINI_API_KEY = "YOUR_API_KEY"
+EMAIL = settings.EMAIL
+PASSWORD = settings.PASSWORD
+GEMINI_API_KEY = settings.GEMINI_API_KEY
+
+# Topic selection: 
+# 0 for 'Select All' topics
+# OR a list of topic positions (1-15) to select specific topics by their position in the list
+# Example: [1, 3, 5] will select the 1st, 3rd, and 5th topics in the list
+TOPIC_SELECTION = settings.topic_selection
+
+# Difficulty selection:
+# "beginner" or "intermediate"
+DIFFICULTY = settings.difficulty
+
+# Map of topic positions (1-15) to their actual checkbox values in the HTML
+# This mapping is based on the provided HTML elements
+TOPIC_POSITION_TO_VALUE = {
+    1: "8",    
+    2: "9",    
+    3: "10",    
+    4: "11",
+    5: "5",
+    6: "6",
+    7: "12",
+    8: "13",
+    9: "0",
+    10: "1",
+    11: "14",
+    12: "2",
+    13: "4",
+    14: "7",
+    15: "3"
+}
 
 # Load environment variables from .env file
 print(f"Email: {EMAIL}")
 print(f"Password: {"*"*len(PASSWORD)}")
 print(f"Gemini API Key: {GEMINI_API_KEY[0:2]}{"*"*(len(GEMINI_API_KEY) - 2)}")
+print(f"Topic Selection: {TOPIC_SELECTION}")
+print(f"Difficulty Level: {DIFFICULTY}")
 
 # Configure the Gemini API
 genai.configure(api_key=GEMINI_API_KEY)
@@ -72,11 +107,20 @@ def extract_code_snippet(driver):
             if start_collecting:
                 # Remove line numbers if present
                 cleaned_line = line
-                # Remove line numbers that appear at the beginning of lines
+                
+                # Better line number removal - check if the line starts with a number followed by space
                 if line.strip() and line.strip()[0].isdigit():
-                    parts = line.split(None, 1)
-                    if len(parts) > 1:
-                        cleaned_line = parts[1]
+                    # Find where the actual code starts after the line number
+                    # This regex pattern matches any digits at the start of the line
+                    import re
+                    match = re.match(r'^\s*\d+\s+(.+)$', line)
+                    if match:
+                        cleaned_line = match.group(1)
+                    else:
+                        # Fallback to simpler method
+                        parts = line.split(None, 1)
+                        if len(parts) > 1 and parts[0].isdigit():
+                            cleaned_line = parts[1]
                 
                 js_code_lines.append(cleaned_line)
         
@@ -92,7 +136,7 @@ def extract_code_snippet(driver):
         return ""
 
 # Function to extract code from language-javascript class element
-def extract_from_language_javascript(driver, max_attempts=5, delay=2):
+def extract_from_language_javascript(driver, max_attempts=3, delay=0.5):
     for attempt in range(max_attempts):
         try:
             print(f"Attempt {attempt+1}/{max_attempts} to find language-javascript element...")
@@ -105,7 +149,7 @@ def extract_from_language_javascript(driver, max_attempts=5, delay=2):
                 
                 # Try to find any code elements as a fallback
                 code_elements = driver.find_elements(By.TAG_NAME, "code")
-                if code_elements:
+                if (code_elements):
                     print(f"Found {len(code_elements)} generic code elements instead.")
                     js_elements = code_elements
                 else:
@@ -185,10 +229,6 @@ def extract_from_language_javascript(driver, max_attempts=5, delay=2):
                 except Exception as inner_e:
                     print(f"Fallback extraction also failed: {str(inner_e)}")
                 
-                # Take a screenshot to see what's on the page
-                screenshot_path = f"code_extraction_failed_{time.time()}.png"
-                driver.save_screenshot(screenshot_path)
-                print(f"Screenshot saved to {screenshot_path}")
                 return ""
 
 # Function to evaluate JavaScript code using Gemini API
@@ -199,7 +239,8 @@ def evaluate_javascript_with_gemini(code):
         
         # Prepare the prompt for Gemini
         prompt = f"""
-        Execute this JavaScript code and respond with ONLY the exact console output value. 
+        Execute this JavaScript code and respond with ONLY the exact console output value.
+        
         No explanations, no code, no markdown formatting.
         
         ```javascript
@@ -208,12 +249,338 @@ def evaluate_javascript_with_gemini(code):
         Return only the raw output value that would appear in the console. Nothing else.
         """
         
+        # Debug output to see what's being sent to Gemini
+        print("\n=== DEBUG: PROMPT SENT TO GEMINI ===")
+        print(prompt)
+        print("=== END OF GEMINI PROMPT ===\n")
+        
         # Generate a response
         response = model.generate_content(prompt)
         
         return response.text
     except Exception as e:
         return f"Error using Gemini API: {str(e)}"
+
+def select_topics(driver, topic_selection):
+    # Wait for the topic selection page to load
+    print("Waiting for topic selection page to load...")
+    time.sleep(1)  # Increased wait time for page to fully load
+    
+    if topic_selection == 0:
+        # Use the 'Select All Topics' button
+        print("Using 'Select All Topics' button as configured...")
+        select_all_topics_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, 
+                "//button[contains(@class, 'MuiButton-containedPrimary') and contains(text(), 'Select All Topics')]"))
+        )
+        print("Clicking on Select All Topics button...")
+        select_all_topics_button.click()
+    else:
+        # Select individual topics via checkboxes
+        print(f"Selecting topics by position: {topic_selection}")
+        
+        # Make sure topic_selection is always a list
+        if not isinstance(topic_selection, list):
+            topic_selection = [topic_selection]
+        
+        # Click each checkbox according to the selected topic positions
+        for topic_position in topic_selection:
+            try:
+                # Convert position to the corresponding value using our mapping
+                if topic_position in TOPIC_POSITION_TO_VALUE:
+                    topic_value = TOPIC_POSITION_TO_VALUE[topic_position]
+                    print(f"Looking for checkbox at position {topic_position} (value={topic_value})...")
+                    
+                    # Try multiple strategies to click the checkbox
+                    
+                    # Strategy 1: Try clicking the label/span wrapping the checkbox first (most reliable)
+                    try:
+                        # Find the parent element that contains the checkbox
+                        # This targets the span or label wrapping the checkbox (common pattern in Material-UI)
+                        checkbox_wrapper = WebDriverWait(driver, 5).until(
+                            EC.element_to_be_clickable((By.XPATH, 
+                                f"//input[@type='checkbox' and @value='{topic_value}']/parent::span"))
+                        )
+                        print(f"Found checkbox wrapper for position {topic_position}. Clicking...")
+                        checkbox_wrapper.click()
+                        print(f"Clicked on wrapper for checkbox at position {topic_position}")
+                        time.sleep(0.1)  # Increased delay between clicks
+                        continue  # Go to next checkbox if successful
+                    except Exception as e1:
+                        print(f"Couldn't click checkbox wrapper: {e1}")
+                    
+                    # Strategy 2: Try finding the parent label if the span didn't work
+                    try:
+                        # Find a wrapping label that might handle the click
+                        checkbox_label = WebDriverWait(driver, 5).until(
+                            EC.element_to_be_clickable((By.XPATH, 
+                                f"//input[@type='checkbox' and @value='{topic_value}']/ancestor::label"))
+                        )
+                        print(f"Found checkbox label for position {topic_position}. Clicking...")
+                        checkbox_label.click()
+                        print(f"Clicked on label for checkbox at position {topic_position}")
+                        time.sleep(0.1)  # Increased delay between clicks
+                        continue  # Go to next checkbox if successful
+                    except Exception as e2:
+                        print(f"Couldn't click checkbox label: {e2}")
+                    
+                    # Strategy 3: Use JavaScript to execute the click (bypass normal click handling)
+                    try:
+                        checkbox = WebDriverWait(driver, 5).until(
+                            EC.presence_of_element_located((By.XPATH, 
+                                f"//input[@type='checkbox' and @value='{topic_value}']"))
+                        )
+                        print(f"Using JavaScript to click checkbox at position {topic_position}")
+                        driver.execute_script("arguments[0].click();", checkbox)
+                        print(f"JavaScript clicked checkbox at position {topic_position}")
+                        time.sleep(0.1)  # Increased delay between clicks
+                    except Exception as e3:
+                        print(f"JavaScript click failed: {e3}")
+                        
+                        # Strategy 4: Final fallback - try to find any clickable element near the checkbox
+                        try:
+                            # Look for any clickable element near the checkbox
+                            outer_container = WebDriverWait(driver, 5).until(
+                                EC.element_to_be_clickable((By.XPATH, 
+                                    f"//input[@type='checkbox' and @value='{topic_value}']/ancestor::div[contains(@class, 'MuiFormControl') or contains(@class, 'MuiCheckbox')]"))
+                            )
+                            print(f"Found outer container for position {topic_position}. Clicking...")
+                            outer_container.click()
+                            print(f"Clicked on container for checkbox at position {topic_position}")
+                            time.sleep(0.1)  # Increased delay between clicks
+                        except Exception as e4:
+                            print(f"All strategies failed for checkbox at position {topic_position}")
+                            raise Exception(f"Could not click checkbox at position {topic_position}")
+                else:
+                    print(f"Warning: Topic position {topic_position} is not valid. Valid positions are 1-15.")
+            except Exception as e:
+                print(f"Error selecting topic at position {topic_position}: {e}")
+    
+    # Wait for the selection to register
+    time.sleep(0.5)  # Increased wait time after selection
+
+def select_difficulty(driver, difficulty):
+    """
+    Selects the difficulty level based on user configuration.
+    
+    Args:
+        driver: The Selenium WebDriver instance
+        difficulty: String value, either "beginner" or "intermediate"
+    """
+    print(f"Setting difficulty level to: {difficulty}")
+    
+    # Make sure the difficulty value is valid
+    if difficulty not in ["beginner", "intermediate"]:
+        print(f"Warning: Invalid difficulty '{difficulty}'. Using 'beginner' as default.")
+        difficulty = "beginner"
+    
+    # Wait for difficulty selection radio buttons to be present
+    time.sleep(0.5)
+    
+    try:
+        # Try multiple strategies to click the radio button
+        
+        # Strategy 1: Try clicking the radio input directly using JavaScript
+        try:
+            radio_button = WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.XPATH, 
+                    f"//input[@type='radio' and @value='{difficulty}']"))
+            )
+            print(f"Found {difficulty} radio button. Using JavaScript to click...")
+            driver.execute_script("arguments[0].click();", radio_button)
+            print(f"Selected {difficulty} difficulty using JavaScript")
+            return
+        except Exception as e1:
+            print(f"JavaScript click on radio button failed: {e1}")
+        
+        # Strategy 2: Try clicking the parent span
+        try:
+            radio_wrapper = WebDriverWait(driver, 5).until(
+                EC.element_to_be_clickable((By.XPATH, 
+                    f"//input[@type='radio' and @value='{difficulty}']/parent::span"))
+            )
+            print(f"Found radio button wrapper. Clicking...")
+            radio_wrapper.click()
+            print(f"Selected {difficulty} difficulty by clicking wrapper")
+            return
+        except Exception as e2:
+            print(f"Clicking radio button wrapper failed: {e2}")
+            
+        # Strategy 3: Try clicking the parent label
+        try:
+            radio_label = WebDriverWait(driver, 5).until(
+                EC.element_to_be_clickable((By.XPATH, 
+                    f"//input[@type='radio' and @value='{difficulty}']/ancestor::label"))
+            )
+            print(f"Found radio button label. Clicking...")
+            radio_label.click()
+            print(f"Selected {difficulty} difficulty by clicking label")
+            return
+        except Exception as e3:
+            print(f"Clicking radio button label failed: {e3}")
+            
+        # Strategy 4: Try finding any clickable element near the radio button
+        try:
+            container = WebDriverWait(driver, 5).until(
+                EC.element_to_be_clickable((By.XPATH, 
+                    f"//input[@type='radio' and @value='{difficulty}']/ancestor::div[contains(@class, 'MuiFormControl') or contains(@class, 'MuiRadio')]"))
+            )
+            print(f"Found outer container for radio button. Clicking...")
+            container.click()
+            print(f"Selected {difficulty} difficulty by clicking container")
+            return
+        except Exception as e4:
+            print(f"All strategies failed for selecting {difficulty} difficulty")
+            raise Exception(f"Could not select {difficulty} difficulty")
+    
+    except Exception as e:
+        print(f"Error selecting difficulty {difficulty}: {e}")
+    
+    # Wait for the selection to register
+    time.sleep(0.5)
+
+# Function to check if we are still on the question page and recover if needed
+def check_and_recover_page(driver, question_number):
+    """
+    Checks if we're still on the question page and attempts to recover if we've been
+    redirected back to the dashboard unexpectedly.
+    
+    Returns:
+        bool: True if we're on the correct page or recovery was successful, False otherwise
+    """
+    current_url = driver.current_url
+    print(f"Current URL: {current_url}")
+    
+    # Check if we're on the dashboard page instead of a question page
+    if "dashboard" in current_url:
+        print(f"WARNING: Detected unexpected return to dashboard during question {question_number}")
+        try:
+            print("Attempting to recover...")
+            
+            # 1. Click on "Single Player" button again
+            print("Looking for Single Player button...")
+            single_player_button = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'MuiListItemButton-root')]//span[text()='Single Player']//ancestor::div[contains(@class, 'MuiButtonBase-root')]"))
+            )
+            print("Clicking on Single Player button...")
+            single_player_button.click()
+            time.sleep(0.5)
+            
+            # 2. Select topics again
+            select_topics(driver, TOPIC_SELECTION)
+            
+            # 3. Select difficulty again
+            select_difficulty(driver, DIFFICULTY)
+            
+            # 4. Click "Start" again
+            print("Looking for Start button...")
+            start_button = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'MuiButton-containedPrimary') and contains(text(), 'Start')]"))
+            )
+            print("Clicking on Start button...")
+            start_button.click()
+            
+            print("Recovery attempt completed. Now we need to skip to the appropriate question...")
+            
+            # We need to skip to the current question
+            # Wait a moment for the first question to load
+            time.sleep(2)
+            
+            # Skip to the current question by clicking "Next" for (question_number-1) times
+            # But only if we're not already on question 1
+            if question_number > 1:
+                print(f"Skipping ahead to question {question_number}...")
+                for i in range(1, question_number):
+                    try:
+                        # Find and click any Next button to continue
+                        skip_button = WebDriverWait(driver, 5).until(
+                            EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Next')]"))
+                        )
+                        skip_button.click()
+                        print(f"Skipped question {i}")
+                        time.sleep(1.5)  # Wait for next question to load
+                    except Exception as e:
+                        print(f"Error while skipping to question {i+1}: {e}")
+                        return False
+            
+            print(f"Recovery successful! Now processing question {question_number}")
+            return True
+            
+        except Exception as e:
+            print(f"Recovery attempt failed: {e}")
+            return False
+    
+    # Check if we're on the authentication page
+    elif "authenticate" in current_url:
+        print(f"WARNING: Session expired, returned to login page during question {question_number}")
+        try:
+            print("Attempting to log back in...")
+            
+            # Find and fill the login fields
+            email_field = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.ID, "«r1»"))
+            )
+            password_field = WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.ID, "«r2»"))
+            )
+            login_button = WebDriverWait(driver, 5).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "button.MuiButtonBase-root.MuiButton-containedPrimary[type='submit']"))
+            )
+            
+            email_field.send_keys(EMAIL)
+            password_field.send_keys(PASSWORD)
+            login_button.click()
+            
+            # Wait for successful login and redirect to dashboard
+            WebDriverWait(driver, 10).until(
+                EC.url_contains("dashboard")
+            )
+            
+            # Now follow the same recovery steps as above
+            # 1. Click on "Single Player" button again
+            single_player_button = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'MuiListItemButton-root')]//span[text()='Single Player']//ancestor::div[contains(@class, 'MuiButtonBase-root')]"))
+            )
+            single_player_button.click()
+            time.sleep(0.5)
+            
+            # 2. Select topics again
+            select_topics(driver, TOPIC_SELECTION)
+            
+            # 3. Select difficulty again
+            select_difficulty(driver, DIFFICULTY)
+            
+            # 4. Click "Start" again
+            start_button = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'MuiButton-containedPrimary') and contains(text(), 'Start')]"))
+            )
+            start_button.click()
+            
+            # Skip to the current question as above
+            time.sleep(2)
+            if question_number > 1:
+                print(f"Skipping ahead to question {question_number}...")
+                for i in range(1, question_number):
+                    try:
+                        skip_button = WebDriverWait(driver, 5).until(
+                            EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Next')]"))
+                        )
+                        skip_button.click()
+                        print(f"Skipped question {i}")
+                        time.sleep(1.5)
+                    except Exception as e:
+                        print(f"Error while skipping to question {i+1}: {e}")
+                        return False
+            
+            print(f"Login recovery successful! Now processing question {question_number}")
+            return True
+            
+        except Exception as e:
+            print(f"Login recovery attempt failed: {e}")
+            return False
+    
+    # We're on the expected page
+    return True
 
 # Set up Chrome options
 chrome_options = Options()
@@ -278,18 +645,15 @@ try:
         )
         print("Clicking on Single Player button...")
         single_player_button.click()
-        time.sleep(0.5)
+        time.sleep(1)
         
-        # 2. Click on "Select All Topics" button
-        print("Looking for Select All Topics button...")
-        select_all_topics_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'MuiButton-containedPrimary') and contains(text(), 'Select All Topics')]"))
-        )
-        print("Clicking on Select All Topics button...")
-        select_all_topics_button.click()
-        time.sleep(0.5)
+        # 2. Select topics based on user configuration
+        select_topics(driver, TOPIC_SELECTION)
         
-        # 3. Click on "Start" button
+        # 3. Select difficulty based on user configuration
+        select_difficulty(driver, DIFFICULTY)
+        
+        # 4. Click on "Start" button
         print("Looking for Start button...")
         start_button = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'MuiButton-containedPrimary') and contains(text(), 'Start')]"))
@@ -298,7 +662,7 @@ try:
         start_button.click()
         
         print("All buttons clicked successfully!")
-        time.sleep(1)  # Wait to see the results
+        time.sleep(3)  # Wait to see the results
         
         # Set up a loop to handle 10 questions
         for question_number in range(1, 11):
@@ -306,6 +670,11 @@ try:
             
             # Wait for the page to load the question
             time.sleep(1.5)
+            
+            # Check if we are still on the question page and recover if needed
+            if not check_and_recover_page(driver, question_number):
+                print(f"Failed to recover page for question {question_number}. Exiting loop.")
+                break
             
             # Try to find and extract code from code-snippet element
             code_snippet = extract_code_snippet(driver)
@@ -365,14 +734,26 @@ try:
                     next_button.click()
                     print(f"Completed question {question_number}/10")
                     
-                    # Wait a moment for the next question to load
-                    time.sleep(1.5)
+                    # Wait a moment and check if we're still on the right page
+                    time.sleep(1)
+                    if not check_and_recover_page(driver, question_number + 1):
+                        print(f"Failed to stay on question page after submitting answer for question {question_number}.")
+                        # If recovery failed, try once more before giving up
+                        time.sleep(1)
+                        if not check_and_recover_page(driver, question_number + 1):
+                            print("Second recovery attempt failed. Exiting loop.")
+                            break
+                    
+                    # Additional wait for next question to load
+                    time.sleep(0.5)
                     
                 except Exception as e:
                     print(f"Error entering answer or clicking Next: {e}")
-                    screenshot_path = f"answer_input_failed_q{question_number}_{time.time()}.png"
-                    driver.save_screenshot(screenshot_path)
-                    print(f"Screenshot saved to {screenshot_path}")
+                    
+                    # Check if we're on the right page before continuing
+                    if not check_and_recover_page(driver, question_number):
+                        print("Could not recover after error. Exiting loop.")
+                        break
                     
                     # Try to continue with the next question if possible
                     try:
@@ -380,14 +761,21 @@ try:
                         fallback_next = driver.find_element(By.XPATH, "//button[contains(text(), 'Next')]")
                         fallback_next.click()
                         print("Used fallback method to proceed to next question")
-                        time.sleep(1.5)
+                        time.sleep(1)
+                        
+                        # Check again if we're on the right page
+                        if not check_and_recover_page(driver, question_number + 1):
+                            print("Could not recover after fallback next button. Exiting loop.")
+                            break
                     except:
                         print(f"Could not proceed to next question. Breaking loop.")
                         break
             else:
-                print(f"No code snippet could be extracted for question {question_number}. Taking screenshot.")
-                screenshot_path = f"no_code_found_q{question_number}_{time.time()}.png"
-                driver.save_screenshot(screenshot_path)
+                
+                # Check if we're on the right page before continuing
+                if not check_and_recover_page(driver, question_number):
+                    print("Could not recover after failing to find code. Exiting loop.")
+                    break
                 
                 # Try to continue with the next question anyway
                 try:
@@ -395,7 +783,12 @@ try:
                     next_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Next')]")
                     next_button.click()
                     print("Skipped to next question")
-                    time.sleep(1.5)
+                    time.sleep(1)
+                    
+                    # Check again if we're on the right page
+                    if not check_and_recover_page(driver, question_number + 1):
+                        print("Could not recover after skipping question. Exiting loop.")
+                        break
                 except Exception as e:
                     print(f"Could not proceed to next question: {e}")
                     break
@@ -424,15 +817,11 @@ try:
             print("Login attempted using alternative selectors")
             
             # Wait for redirect
-            time.sleep(3)
+            time.sleep(2)
             
         except Exception as e2:
             print(f"Alternative approach also failed: {e2}")
         
-        # Take a screenshot for debugging
-        screenshot_path = "error_screenshot.png"
-        driver.save_screenshot(screenshot_path)
-        print(f"Screenshot saved to {screenshot_path}")
 
 finally:
     # Optional: Add a pause to see the final state

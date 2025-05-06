@@ -1,4 +1,4 @@
 selenium
-beautifulsoup
+beautifulsoup4
 google-generativeai
 webdriver-manager
